@@ -18,10 +18,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache the tectonic bundle (IEEEtran, pgfplots, fonts)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/Tectonic
           key: tectonic-${{ runner.os }}-${{ hashFiles('paper/ieee/typedecide.tex') }}
@@ -44,7 +44,7 @@ jobs:
         run: make check
 
       - name: Upload the PDF
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: typedecide-paper
           path: paper/ieee/typedecide.pdf
@@ -52,7 +52,7 @@ jobs:
 
       - name: Upload the LaTeX log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: typedecide-paper-log
           path: paper/ieee/typedecide.log
