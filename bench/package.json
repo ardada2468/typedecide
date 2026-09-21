@@ -1,0 +1,11 @@
+{
+  "name": "jev-custom-bench",
+  "private": true,
+  "type": "module",
+  "description": "Evidence for the claims in README.md. Run with node; models download to the HF cache.",
+  "scripts": {
+    "shared": "node shared_check.mjs",
+    "rotation": "node rotation_probe.mjs"
+  },
+  "dependencies": { "@huggingface/transformers": "^4.3.0" }
+}

@@ -1,0 +1,18 @@
+{
+  "fixture": "openjev/authored144",
+  "rows": 144,
+  "model": "onnx-community/Qwen3-0.6B-ONNX",
+  "dtype": "q4f16",
+  "mode": "readout-cyclic",
+  "shots": 3,
+  "per_family": {
+    "candidate_selection": 0.5228758169934641,
+    "evidence_interpretation": 0.36746031746031743,
+    "rule_application": 0.557936507936508
+  },
+  "mean_family_balanced_accuracy": 0.4827575474634298,
+  "plain_accuracy": 0.5347222222222222,
+  "order_unstable": 87,
+  "unparsed": 0,
+  "seconds": 537.254
+}

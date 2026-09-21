@@ -1,0 +1,25 @@
+__pycache__/
+node_modules/
+train/data/
+train/runs/
+web/models/
+.DS_Store
+
+# Other people's repositories, fetched by bench/fetch_fixtures.sh
+reference-openjev/
+reference-sarvam-jev/
+
+# Cached API responses (may contain prompts; never keys)
+bench/.cache/
+
+# Python build, docs and tooling output
+dist/
+build/
+*.egg-info/
+site/
+.venv/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/

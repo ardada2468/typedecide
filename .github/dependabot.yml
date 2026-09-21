@@ -1,0 +1,48 @@
+# Dependabot opens pull requests; it never merges them. Every update goes through the
+# same CI as any other change, including the blocking pip-audit of the base install.
+version: 2
+updates:
+  # The published library. Its runtime dependencies are declared as lower bounds in
+  # pyproject.toml, so most of what arrives here is the dev and docs tooling.
+  - package-ecosystem: pip
+    directory: /packages/typedecide
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "python"]
+    commit-message:
+      prefix: "deps(python)"
+    groups:
+      dev-tooling:
+        patterns: ["pytest*", "ruff", "mypy", "types-*"]
+      docs-tooling:
+        patterns: ["mkdocs*"]
+      # torch, transformers, peft and friends move together and break together.
+      ml-stack:
+        patterns: ["torch", "transformers", "peft", "accelerate", "datasets", "optimum*", "onnx*"]
+
+  # The benchmark harness. Not published, but it produces the numbers the README quotes.
+  - package-ecosystem: npm
+    directory: /bench
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: ["dependencies", "javascript"]
+    commit-message:
+      prefix: "deps(bench)"
+
+  # The workflows themselves, including the release pipeline.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "deps(ci)"
+    groups:
+      actions:
+        patterns: ["*"]

@@ -1,0 +1,183 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "typedecide"
+# Single-sourced from src/typedecide/__init__.py; see [tool.hatch.version].
+dynamic = ["version"]
+description = "Fine-tune small language models to answer bounded decisions by logit readout, and ship them to a browser."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Arnav Dadarya" }]
+maintainers = [{ name = "Arnav Dadarya" }]
+keywords = [
+  "llm",
+  "small-language-models",
+  "fine-tuning",
+  "lora",
+  "peft",
+  "classification",
+  "decision",
+  "logits",
+  "constrained-decoding",
+  "position-bias",
+  "evaluation",
+  "onnx",
+  "transformers",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+dependencies = [
+  "numpy>=1.24",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+train = [
+  "torch>=2.4",
+  "transformers>=4.51",
+  "peft>=0.13",
+  "accelerate>=0.34",
+  "datasets>=3.0",
+]
+export = [
+  "optimum[exporters]>=1.23",
+  "onnx>=1.16",
+  "onnxruntime>=1.20",
+]
+parquet = ["pyarrow>=15.0"]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "mypy>=1.11",
+  "ruff>=0.6",
+]
+docs = [
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.26",
+]
+all = ["typedecide[train,export,parquet]"]
+
+[project.urls]
+Homepage = "https://github.com/ardada2468/typedecide"
+Documentation = "https://ardada2468.github.io/typedecide/"
+Repository = "https://github.com/ardada2468/typedecide"
+Issues = "https://github.com/ardada2468/typedecide/issues"
+Changelog = "https://github.com/ardada2468/typedecide/blob/main/packages/typedecide/CHANGELOG.md"
+
+[project.scripts]
+typedecide = "typedecide.cli:main"
+
+[tool.hatch.version]
+path = "src/typedecide/__init__.py"
+
+# The wheel is the importable package and nothing else. py.typed rides along
+# because it lives inside src/typedecide.
+[tool.hatch.build.targets.wheel]
+packages = ["src/typedecide"]
+# 2.4 is the version that introduced License-Expression and is accepted by every
+# index and installer in use. Pinned so a hatchling upgrade cannot start emitting a
+# newer core-metadata version than the index accepts on release day.
+core-metadata-version = "2.4"
+
+# The sdist is what a downstream packager rebuilds and re-tests from, so it carries
+# the tests and the prose docs. It is an allow-list: anything not named here (caches,
+# a built site/, virtualenvs, coverage output) cannot leak in.
+[tool.hatch.build.targets.sdist]
+core-metadata-version = "2.4"
+include = [
+  "/src/typedecide",
+  "/tests",
+  "/docs",
+  "/mkdocs.yml",
+  "/README.md",
+  "/CHANGELOG.md",
+  "/CONTRACTS.md",
+  "/LICENSE",
+  "/pyproject.toml",
+]
+exclude = [
+  "__pycache__",
+  "*.py[cod]",
+  ".DS_Store",
+  "/site",
+  "/dist",
+  "/build",
+  ".mypy_cache",
+  ".ruff_cache",
+  ".pytest_cache",
+  ".coverage*",
+  "htmlcov",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RET", "ARG", "PTH"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unreachable = true
+disallow_untyped_defs = true
+# Optional heavy dependencies are not installed in the lint environment.
+[[tool.mypy.overrides]]
+module = ["torch.*", "transformers.*", "peft.*", "datasets.*", "optimum.*", "onnx.*", "onnxruntime.*", "yaml", "pyarrow.*"]
+ignore_missing_imports = true
+
+# numpy >= 2.5 ships stubs that use the 3.12-only `type` statement. We type-check
+# against 3.10, the oldest version we support, so mypy cannot parse them and stops.
+# We call nothing in numpy that needs its types; skip following the import.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+# Without this, `follow_imports` is ignored for .pyi files -- which is what numpy ships.
+follow_imports_for_stubs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["typedecide"]
+branch = true
+
+# Map the installed copy back onto src/ so a run against a built wheel and a run
+# against an editable install report the same paths.
+[tool.coverage.paths]
+source = ["src/typedecide", "*/site-packages/typedecide"]
+
+[tool.coverage.report]
+# Measured 96.2% (line + branch) on the [dev] install, 98.8% with pyarrow and onnx.
+# The floor is a ratchet against regressions, not a target. Be clear about what the
+# number means: the torch-dependent modules (trainer, readout, export) are covered
+# through stand-ins for torch/transformers/peft/optimum, which verifies their WIRING
+# and not their numerics. Nothing here has been run against real weights or a GPU.
+fail_under = 95
+show_missing = true
+skip_covered = false
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+  "@overload",
+]

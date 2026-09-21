@@ -1,0 +1,54 @@
+name: Feature request
+description: Propose a change or an addition to the typedecide library or CLI.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what stops you today? Start from the task, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: The API, flag or behaviour you have in mind. A sketch of the call you wish you could write is ideal.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and workarounds
+      description: What you do instead today, and other designs you considered.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - data (loading, validating, splitting)
+        - training
+        - evaluation
+        - export (ONNX, pruning, quantisation)
+        - CLI
+        - documentation
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Fit with the project's constraints
+      description: These are fixed; a proposal that needs to break one should say so up front.
+      options:
+        - label: It does not change the text produced by `prompt.py` (or it explains why every existing adapter should be invalidated).
+        - label: It keeps `import typedecide` free of torch and other heavy dependencies.
+        - label: It is additive, or it describes the deprecation path for what it changes.
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a pull request for this.

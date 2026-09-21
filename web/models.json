@@ -1,0 +1,27 @@
+{
+  "schema": "jev-custom-models-v1",
+  "note": "Answer-slot token ids are NOT listed here. This build discovers them at runtime from the real tokenizer, because they are non-contiguous in every vocabulary we tested and a hardcoded labelBase+index is silently wrong.",
+  "models": [
+    {
+      "id": "qwen3-0.6b",
+      "name": "Qwen3 0.6B",
+      "repo": "onnx-community/Qwen3-0.6B-ONNX",
+      "dtype": { "webgpu": "q4f16", "wasm": "q4" },
+      "size": "~450 MB",
+      "role": "base",
+      "note": "Stock weights. Reads the evidence but is not tuned to this policy.",
+      "style": "completion"
+    },
+    {
+      "id": "qwen3-0.6b-triage",
+      "name": "Qwen3 0.6B · triage-tuned",
+      "repo": "models/qwen3-0.6b-triage-onnx",
+      "local": true,
+      "dtype": { "webgpu": "q4f16", "wasm": "q4" },
+      "size": "~450 MB",
+      "role": "fine-tuned",
+      "note": "LoRA-tuned on synthesized triage decisions by train/. Appears once you have exported it.",
+      "style": "completion"
+    }
+  ]
+}

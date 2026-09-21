@@ -1,0 +1,90 @@
+name: Bug report
+description: Something in the typedecide library or CLI behaves wrongly.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. **Security problems do not go here**: report them
+        privately as described in [SECURITY.md](https://github.com/ardada2468/typedecide/blob/main/SECURITY.md).
+
+        Please do not paste real customer data. Replace anything sensitive; the shape of
+        the row is what matters, not its contents.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: The smallest command or script, and the smallest dataset, that shows it.
+      render: shell
+      placeholder: |
+        $ cat tickets.csv
+        id,state,question,options,answer_id
+        t1,Example evidence,How urgent?,Can wait|Today,Today
+
+        $ typedecide validate tickets.csv
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Full output
+      description: The complete `error:` line or traceback. Run the CLI with `-v` for debug logging.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: typedecide version
+      description: python -c "import typedecide; print(typedecide.__version__)"
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version and operating system
+      placeholder: Python 3.12.4, Ubuntu 24.04 / macOS 15 / Windows 11
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - data (loading, validating, splitting)
+        - training
+        - evaluation
+        - export (ONNX, pruning, quantisation)
+        - CLI
+        - documentation
+        - not sure
+    validations:
+      required: true
+  - type: textarea
+    id: extras
+    attributes:
+      label: Optional dependencies, if relevant
+      description: |
+        For training, evaluation or export problems: versions of torch, transformers, peft,
+        optimum, onnx and onnxruntime, the accelerator, and the base model id. The
+        `versions` block of `manifest.json` has most of this.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: The reproduction contains no real customer data or credentials.
+          required: true

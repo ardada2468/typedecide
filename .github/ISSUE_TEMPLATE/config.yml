@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/ardada2468/typedecide/security/advisories/new
+    about: Please report security problems privately. Do not open a public issue.
+  - name: Documentation
+    url: https://ardada2468.github.io/typedecide/
+    about: Guides, concepts and the API reference.

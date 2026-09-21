@@ -1,0 +1,59 @@
+name: paper
+
+# Builds paper/ieee/typedecide.pdf with tectonic and uploads it as an artifact.
+# Nothing here runs a model: every number in the paper is read from files already
+# committed under bench/results/, so the build is pure typesetting.
+on:
+  push:
+    paths:
+      - 'paper/**'
+      - '.github/workflows/paper.yml'
+  pull_request:
+    paths:
+      - 'paper/**'
+      - '.github/workflows/paper.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache the tectonic bundle (IEEEtran, pgfplots, fonts)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Tectonic
+          key: tectonic-${{ runner.os }}-${{ hashFiles('paper/ieee/typedecide.tex') }}
+          restore-keys: tectonic-${{ runner.os }}-
+
+      - name: Install tectonic
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libfontconfig1 libgraphite2-3 libharfbuzz0b libicu-dev
+          mkdir -p "$HOME/.local/bin" && cd "$HOME/.local/bin"
+          curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build the PDF
+        working-directory: paper/ieee
+        run: make
+
+      - name: Fail on undefined references or badly overfull boxes
+        working-directory: paper/ieee
+        run: make check
+
+      - name: Upload the PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: typedecide-paper
+          path: paper/ieee/typedecide.pdf
+          if-no-files-found: error
+
+      - name: Upload the LaTeX log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typedecide-paper-log
+          path: paper/ieee/typedecide.log
+          if-no-files-found: ignore

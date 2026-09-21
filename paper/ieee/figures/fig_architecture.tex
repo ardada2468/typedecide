@@ -1,0 +1,34 @@
+% Fig. 1 -- system architecture. Conceptual diagram; no measured data.
+% Mirrors web/engine.js: Engine.prefill() -> Engine.score() -> readSlots(), and
+% Engine.generate() -> firstJsonObject() -> auditJson() for the generation lane.
+\begin{tikzpicture}[
+    font=\scriptsize, >=Latex,
+    box/.style={draw, rounded corners=1pt, align=center, inner sep=2pt, minimum height=5.4mm},
+    lite/.style={box, fill=black!10},
+    dark/.style={box, fill=black!28},
+    lab/.style={font=\scriptsize\itshape, anchor=west}]
+  % ---------------- (a) readout path
+  \node[lab] at (0,0.95) {(a) Typed readout (this work)};
+  \node[lite, minimum width=13mm, anchor=west] (state) at (0,-0.45) {state $s$\\(head)};
+  \node[dark, minimum width=10mm, anchor=west] (kv) at (2.15,-0.45) {KV\\cache};
+  \draw[->] (state) -- node[above, font=\tiny, inner sep=1pt]{prefill} node[below, font=\tiny, inner sep=1pt]{once} (kv);
+  \foreach \i/\y/\q in {1/0.25/1, 2/-0.45/2, 3/-1.15/N} {
+    \node[box, minimum width=13mm, anchor=west] (c\i) at (3.95,\y) {suffix $q_{\q}$};
+    \node[lite, minimum width=24mm, anchor=west] (s\i) at (5.85,\y) {softmax$(\ell_{t_{\mathrm A}},\ell_{t_{\mathrm B}},\dots)$};
+    \draw[->] (kv.east) -- (c\i.west);
+    \draw[->] (c\i) -- (s\i);
+  }
+  \node[font=\tiny, align=center] at (4.6,-1.72) {serial, batch $=1$,\\one forward pass each};
+  \node[font=\tiny, align=center] at (7.05,-1.72) {closed support,\\nothing sampled};
+  % ---------------- (b) generation path
+  \draw[black!40] (0,-2.15) -- (8.3,-2.15);
+  \node[lab] at (0,-2.45) {(b) Generation baseline};
+  \node[lite, minimum width=21mm, anchor=west] (full) at (0,-3.2) {state $s$ + all $N$\\criteria + key list};
+  \node[box, minimum width=16mm, anchor=west] (dec) at (2.75,-3.2) {decode token\\by token};
+  \node[box, minimum width=11mm, anchor=west] (json) at (5.0,-3.2) {JSON\\text};
+  \node[box, minimum width=13mm, anchor=west] (parse) at (6.75,-3.2) {parse +\\validate};
+  \draw[->] (full) -- (dec); \draw[->] (dec) -- (json); \draw[->] (json) -- (parse);
+  \draw[->] ($(dec.south)+(0.35,0)$) .. controls +(0.25,-0.5) and +(-0.25,-0.5) .. ($(dec.south)+(-0.35,0)$);
+  \node[font=\tiny] at ($(dec.south)+(0,-0.55)$) {autoregressive};
+  \node[font=\tiny, align=center] at ($(parse.south)+(-0.2,-0.42)$) {keys may be missing,\\values may be illegal};
+\end{tikzpicture}

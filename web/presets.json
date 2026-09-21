@@ -1,0 +1,81 @@
+{
+  "schema": "jev-custom-presets-v1",
+  "rubric": [
+    { "key": "queue", "question": "Which queue should handle this ticket?",
+      "options": [
+        { "id": "billing", "description": "Billing and payments" },
+        { "id": "auth", "description": "Account access and authentication" },
+        { "id": "shipping", "description": "Shipping and delivery" },
+        { "id": "sales", "description": "Sales and product evaluation" }
+      ] },
+    { "key": "urgency", "question": "How urgent is this ticket?",
+      "options": [
+        { "id": "p0", "description": "P0 - drop everything" },
+        { "id": "p1", "description": "P1 - resolve today" },
+        { "id": "p2", "description": "P2 - resolve this week" },
+        { "id": "p3", "description": "P3 - backlog" }
+      ] },
+    { "key": "tone", "question": "What is the customer's tone?",
+      "options": [
+        { "id": "angry", "description": "Angry" },
+        { "id": "frustrated", "description": "Frustrated but civil" },
+        { "id": "neutral", "description": "Neutral" },
+        { "id": "appreciative", "description": "Appreciative" }
+      ] },
+    { "key": "approval", "question": "Policy: any refund above 5000 needs manager approval. Does this ticket need one?",
+      "options": [
+        { "id": "needed", "description": "Manager approval is required" },
+        { "id": "not_needed", "description": "Manager approval is not required" },
+        { "id": "no_refund", "description": "No refund is being requested" }
+      ] },
+    { "key": "escalation", "question": "Is there a risk of chargeback, churn, or public escalation?",
+      "options": [
+        { "id": "yes", "description": "Yes, the ticket signals escalation risk" },
+        { "id": "no", "description": "No such signal is present" }
+      ] },
+    { "key": "prior_contact", "question": "Assess the claim: the customer has already contacted support about this.",
+      "options": [
+        { "id": "supported", "description": "Supported by the evidence" },
+        { "id": "undetermined", "description": "Not determined by the evidence" },
+        { "id": "contradicted", "description": "Contradicted by the evidence" }
+      ] },
+    { "key": "actionable", "question": "Is there enough information in the ticket to act on it?",
+      "options": [
+        { "id": "actionable", "description": "Enough to act now" },
+        { "id": "needs_info", "description": "More information is needed first" }
+      ] },
+    { "key": "routing", "question": "Should the first reply come from a person or an automated acknowledgement?",
+      "options": [
+        { "id": "person", "description": "A person should reply first" },
+        { "id": "auto", "description": "An automated acknowledgement is appropriate" }
+      ] },
+    { "key": "deadline", "question": "Does the customer state a deadline or time limit?",
+      "options": [
+        { "id": "yes", "description": "A deadline is stated" },
+        { "id": "no", "description": "No deadline is stated" }
+      ] },
+    { "key": "compensation", "question": "Is the customer asking for money back rather than a fix?",
+      "options": [
+        { "id": "money", "description": "They want money back" },
+        { "id": "fix", "description": "They want the problem fixed" },
+        { "id": "both", "description": "They want both" }
+      ] }
+  ],
+  "tickets": [
+    {
+      "id": "double-charge",
+      "label": "Double charge, threatening a dispute",
+      "text": "Ticket #4471 — Priya R.\n\nI was charged twice for order A-9923 on 14 March. Both charges show on my card statement, 4,860 each, and I have attached screenshots of both. I emailed on the 15th and again on the 18th and nobody has replied.\n\nI need one of these charges reversed. If I don't hear back by tomorrow I am raising a dispute with my bank and I will be posting about this."
+    },
+    {
+      "id": "locked-out",
+      "label": "Locked out before a deadline",
+      "text": "Ticket #4488 — Daniel O.\n\nHi, I can't sign in to my account. I have asked for a password reset four times today and the email never arrives — I checked spam. My team's quarterly report is due Friday and everything is in there.\n\nIs there another way to verify who I am? Happy to jump on a call. Thanks for any help."
+    },
+    {
+      "id": "missing-parcel",
+      "label": "Parcel missing, first contact",
+      "text": "Ticket #4502 — Anu K.\n\nOrder B-1180 was marked delivered on Monday but nothing arrived. The tracking says it left the depot on Saturday. I've checked with the neighbours and the building reception, no one has it.\n\nThis is the first time I'm writing in. Could you look into where it went? I'd rather have the item than a refund if it can still be found."
+    }
+  ]
+}

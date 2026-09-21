@@ -1,0 +1,22 @@
+% Fig. 2 -- prompt anatomy. Text follows web/prompt.js (INSTRUCTION, headText, tailText).
+% The example state/criterion are from bench/shared_check.mjs (abbreviated).
+\begin{tikzpicture}[font=\scriptsize]
+  \def\W{54mm}
+  \node[draw, fill=black!12, text width=\W, inner sep=2.5pt, align=left, anchor=north west, font=\ttfamily\tiny] (head) at (0,0) {%
+    Apply the criterion to the evidence and choose exactly one listed option. Answer with only the uppercase letter of that option.\\[3pt]
+    Evidence:\\
+    Ticket \#4471. Customer reports they were charged twice for order A-9923 \dots\textbackslash n};
+  \node[draw, text width=\W, inner sep=2.5pt, align=left, anchor=north west, font=\ttfamily\tiny] (tail) at (head.south west) {%
+    \textbackslash nCriterion: Which queue should handle this ticket?\\
+    Options:\\
+    A. Account access and authentication\\
+    B. Billing and payments\\
+    C. Sales and product evaluation\\
+    D. Shipping and logistics\\
+    Answer:\,\tikz[baseline=-0.4ex]{\node[draw, fill=black!35, minimum width=3.2mm, minimum height=2.2mm, inner sep=0pt]{};}%
+    \ \ {\normalfont\tiny$\longleftarrow$ \textbf{answer slot}}};
+  \draw[decorate, decoration={brace, amplitude=3pt}] ($(head.north east)+(0.8mm,0)$) -- ($(head.south east)+(0.8mm,0)$)
+    node[midway, right=3pt, align=left, text width=21mm, font=\tiny] {\textbf{shared head}:\\ prefilled once into the KV cache; its last token is dropped};
+  \draw[decorate, decoration={brace, amplitude=3pt}] ($(tail.north east)+(0.8mm,0)$) -- ($(tail.south east)+(0.8mm,0)$)
+    node[midway, right=3pt, align=left, text width=21mm, font=\tiny] {\textbf{per-criterion tail}:\\ the only tokens evaluated per decision};
+\end{tikzpicture}

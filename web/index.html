@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision readout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">Typed decisions <span class="sep">/</span> nothing leaves this tab</p>
+  <h1>Read the answer.<br>Don't write it.</h1>
+  <p class="standfirst">
+    Most decisions we ask a model to make are small: <em>route this ticket, how urgent, does this
+    need approval.</em> A chat model can answer, but it spends its time generating text the caller
+    immediately parses back into an <code>if</code>. This page reads the answer straight out of the
+    probability distribution instead, and runs the whole thing in your browser.
+  </p>
+
+  <dl class="rig">
+    <div><dt>Model</dt><dd id="rig-model">Qwen3 0.6B</dd></div>
+    <div><dt>Backend</dt><dd id="rig-device">not started</dd></div>
+    <div><dt>Weights</dt><dd id="rig-dtype">&mdash;</dd></div>
+    <div><dt>Server</dt><dd>none</dd></div>
+  </dl>
+</header>
+
+<main>
+
+  <section class="panel" aria-labelledby="h-specimen">
+    <div class="panel-head">
+      <h2 id="h-specimen"><span class="tag">01</span> The ticket</h2>
+      <div class="ticket-picker" id="ticket-picker" role="group" aria-label="Choose a ticket"></div>
+    </div>
+    <textarea id="state" spellcheck="false" aria-label="Ticket text"></textarea>
+    <p class="hint">Edit it freely &mdash; the state is prefilled once, whatever it says.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="h-rubric">
+    <div class="panel-head">
+      <h2 id="h-rubric"><span class="tag">02</span> The questions</h2>
+      <p class="panel-note">Write your own. Every criterion is asked about the same state, which is
+        prefilled once &mdash; so a criterion costs a short suffix, not another full prompt.</p>
+    </div>
+
+    <ol class="rubric" id="rubric"></ol>
+
+    <div class="rubric-actions">
+      <button type="button" id="add-criterion" class="ghost">Add a criterion</button>
+      <button type="button" id="reset-rubric" class="ghost quiet">Reset to the example</button>
+      <p class="rubric-tally" id="rubric-tally"></p>
+    </div>
+    <p class="rubric-problems" id="rubric-problems" hidden></p>
+  </section>
+
+  <section class="panel bench" aria-labelledby="h-run">
+    <div class="panel-head">
+      <h2 id="h-run"><span class="tag">03</span> Run</h2>
+    </div>
+    <div class="controls">
+      <button id="run" class="primary" disabled>Loading model&hellip;</button>
+      <label class="check"><input type="checkbox" id="shuffle"> Shuffle option order</label>
+      <label class="check"><input type="checkbox" id="namekeys" checked> Name every required key for the generation lane</label>
+      <label class="check"><input type="checkbox" id="cold"> Also measure without state reuse</label>
+    </div>
+    <div class="loadbar" id="loadbar" hidden><div class="loadbar-fill" id="loadbar-fill"></div></div>
+    <p class="status" id="status">Fetching weights. First visit downloads once, then it is cached.</p>
+  </section>
+
+  <!-- signature: both lanes plotted on one real millisecond axis -->
+  <section class="panel trace" aria-labelledby="h-trace" id="trace-panel" hidden>
+    <div class="panel-head">
+      <h2 id="h-trace"><span class="tag">04</span> Elapsed</h2>
+      <p class="panel-note">Lanes are measured separately and aligned at zero. Running both at once on one GPU would make both numbers meaningless.</p>
+    </div>
+
+    <div class="channels" id="channels">
+      <div class="channel" data-lane="readout">
+        <div class="channel-label">
+          <span class="dot"></span> Readout
+          <em>probabilities taken from the logits</em>
+        </div>
+        <div class="channel-track" id="track-readout"></div>
+        <div class="channel-total" id="total-readout">&mdash;</div>
+      </div>
+      <div class="channel" data-lane="generate">
+        <div class="channel-label">
+          <span class="dot"></span> Generation
+          <em>same model, same question, writing JSON</em>
+        </div>
+        <div class="channel-track" id="track-generate"></div>
+        <div class="channel-total" id="total-generate">&mdash;</div>
+      </div>
+      <div class="axis" aria-hidden="true"><div class="axis-track" id="axis"></div></div>
+    </div>
+
+    <dl class="readings" id="readings"></dl>
+  </section>
+
+  <section class="results" id="results" hidden>
+    <div class="panel lane-readout" aria-labelledby="h-readout">
+      <div class="panel-head">
+        <h2 id="h-readout"><span class="tag">05</span> Readout</h2>
+        <p class="panel-note">One softmax per criterion, over that criterion's own options.</p>
+      </div>
+      <div id="readout-rows" class="readout-rows"></div>
+      <p class="caveat">Probabilities are conditional on the options shown and are <strong>not</strong> calibrated confidence. Don't threshold on them.</p>
+    </div>
+
+    <div class="panel lane-generate" aria-labelledby="h-generate">
+      <div class="panel-head">
+        <h2 id="h-generate"><span class="tag">06</span> Generation</h2>
+        <p class="panel-note">The same model, shown a worked example, asked for JSON.</p>
+      </div>
+      <pre id="gen-text" class="gen-text" aria-live="polite"></pre>
+      <div id="gen-audit" class="audit"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <h2>What this does and does not show</h2>
+  <ul>
+    <li><strong>The readout cannot return a malformed answer.</strong> Each criterion's softmax ranges only over its own answer letters, so an option id belonging to a different criterion is not a value it can produce. The generation lane has no such guarantee, which is what the audit column is counting.</li>
+    <li><strong>The readout is not dramatically faster overall, and we are not going to pretend it is.</strong> Given a carefully written prompt that names every key, the generation lane answers correctly in roughly the same order of time. What the readout wins is the <em>first</em> decision, which lands in about a fifth of a second while generation has produced nothing usable, plus a per-option probability that generation cannot give you at all. Untick the key-naming box to see what the same lane does with a prompt that is merely reasonable.</li>
+    <li><strong>Criteria are scored one at a time, not in one batch.</strong> ONNX Runtime's fused attention kernel refuses a batch wider than one once a past-key cache is supplied, so the parallel branch pass that a server can do is not available in any browser runtime we tested. What the prefill buys here is a shorter prompt per decision, not a single forward pass.</li>
+    <li><strong>Timings are your hardware.</strong> They are not comparable between machines, and the first run after load is slower while shaders compile.</li>
+    <li><strong>Accuracy is untuned.</strong> On an eight-item probe with every option order rotated, the stock weights answered 63% correctly and kept the same answer under reordering 7 times out of 8. That is a signal, not a benchmark, and it is the reason the fine-tune in <code>train/</code> exists.</li>
+  </ul>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

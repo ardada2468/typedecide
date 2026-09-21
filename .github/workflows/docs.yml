@@ -1,0 +1,107 @@
+name: docs
+
+# Builds the documentation site for packages/typedecide with MkDocs and publishes it
+# to GitHub Pages, with the static browser demo from web/ served beside it at /demo/.
+#
+#   push to main   -> build --strict, then deploy
+#   pull request   -> build --strict only (nothing is deployed)
+#   manual run     -> build --strict, then deploy (from main only)
+#
+# One-time repository setup: Settings > Pages > Build and deployment > Source must be
+# "GitHub Actions". The `github-pages` environment is created automatically.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/typedecide/**"
+      - "web/**"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "packages/typedecide/**"
+      - "web/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+# Least privilege. The deploy job asks for what it needs.
+permissions:
+  contents: read
+
+# One Pages deployment at a time. A build for a pull request may be cancelled by a
+# newer push to the same ref; a deployment that has started is allowed to finish.
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PACKAGE_DIR: packages/typedecide
+  PYTHON_VERSION: "3.12"
+  # Material prints a long advisory banner about MkDocs 2.0 on every build. It is not a
+  # build warning and does not affect --strict; this only keeps the log readable.
+  NO_MKDOCS_2_WARNING: "1"
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ${{ env.PACKAGE_DIR }}/docs/requirements.txt
+
+      # The library itself is not installed: mkdocstrings reads src/ statically with
+      # griffe, so the build needs neither torch nor transformers.
+      - name: Install documentation dependencies
+        run: python -m pip install -r "${PACKAGE_DIR}/docs/requirements.txt"
+
+      - name: mkdocs build --strict
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: mkdocs build --strict
+
+      # Serve the live browser demo from the same Pages site, at /demo/.
+      - name: Copy web/ into the site as /demo/
+        run: |
+          test -f web/index.html
+          rm -rf "${PACKAGE_DIR}/site/demo"
+          mkdir -p "${PACKAGE_DIR}/site/demo"
+          cp -R web/. "${PACKAGE_DIR}/site/demo/"
+          # Locally exported model weights are gitignored and must never be published.
+          rm -rf "${PACKAGE_DIR}/site/demo/models"
+          # The artifact is served as-is; make sure nothing downstream runs Jekyll,
+          # which would drop files whose names start with an underscore.
+          touch "${PACKAGE_DIR}/site/.nojekyll"
+          test -f "${PACKAGE_DIR}/site/index.html"
+          test -f "${PACKAGE_DIR}/site/demo/index.html"
+
+      - name: Upload the Pages artifact
+        # Pull requests build the site to prove it builds; they do not publish it.
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.PACKAGE_DIR }}/site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    # Never from a pull request, and never from a manual run on another branch.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write      # publish the Pages deployment
+      id-token: write   # prove to Pages that the deployment comes from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

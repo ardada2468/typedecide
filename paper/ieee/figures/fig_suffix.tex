@@ -1,0 +1,22 @@
+% Fig. 4 -- suffix length vs latency.
+% Data: bench/results/logit-cost-Qwen3-0.6B-q4f16.json  (points_ms, fit)
+%   backend: onnxruntime-node, CPU; prefix_tokens = 35; median of 5 repeats per point.
+%   fit: 28.4 ms + 3.23 ms/token (least squares over the six points).
+\begin{tikzpicture}
+\begin{axis}[
+    width=\columnwidth, height=48mm,
+    xmin=0, xmax=104, ymin=0, ymax=380,
+    xlabel={suffix length (tokens)}, ylabel={median latency (ms)},
+    xlabel style={font=\scriptsize}, ylabel style={font=\scriptsize},
+    ticklabel style={font=\scriptsize},
+    xtick={1,8,16,32,45,64,96},
+    legend style={font=\tiny, at={(0.03,0.97)}, anchor=north west, draw=none, fill=none, row sep=-1pt},
+    legend cell align=left, grid=major, grid style={black!12}]
+  \addplot[only marks, mark=*, mark size=1.8pt, black] coordinates {(1,32.1) (8,54.0) (16,80.0) (32,132.4) (64,233.6) (96,339.6)};
+  \addlegendentry{measured (6 points)}
+  \addplot[domain=0:100, samples=2, black, thick] {28.4 + 3.23*x};
+  \addlegendentry{fit: $28.4 + 3.23\,m$ ms}
+  \addplot[only marks, mark=o, mark size=2.6pt, black] coordinates {(45,173.75)};
+  \addlegendentry{projected, $m{=}45$: $\approx$174 ms}
+\end{axis}
+\end{tikzpicture}

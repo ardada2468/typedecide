@@ -1,0 +1,275 @@
+name: release
+
+# Pushing a tag vX.Y.Z publishes packages/typedecide.
+#
+#   vX.Y.ZrcN  -> TestPyPI  (environment: testpypi)
+#   vX.Y.Z     -> PyPI      (environment: pypi)
+#
+# Authentication is PyPI Trusted Publishing (OIDC). There are no API tokens and no
+# repository secrets in this workflow, and there must never be. The runbook, including
+# the one-time publisher registration, is packages/typedecide/RELEASING.md.
+#
+# Everything that can fail is checked in `build`, before anything is uploaded: a
+# PyPI upload cannot be undone, and a version number cannot be reused.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+# Least privilege. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
+# Never run two releases of the same tag at once, and never cancel one half-way
+# through an upload.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE_DIR: packages/typedecide
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build:
+    name: Build, check and smoke-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Tag must match __version__
+        id: version
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          from pathlib import Path
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          init = Path(os.environ["PACKAGE_DIR"]) / "src" / "typedecide" / "__init__.py"
+          found = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', init.read_text(), re.M)
+          if not found:
+              sys.exit(f"::error file={init}::no __version__ assignment found")
+          version = found.group(1)
+
+          # PEP 440 final or release candidate, nothing else is releasable from here.
+          if not re.fullmatch(r"\d+\.\d+\.\d+(rc\d+)?", version):
+              sys.exit(f"::error file={init}::__version__ {version!r} is not X.Y.Z or X.Y.ZrcN")
+          if tag != f"v{version}":
+              sys.exit(
+                  f"::error file={init}::tag {tag!r} does not match __version__ {version!r}. "
+                  f"Expected tag 'v{version}'. Delete the tag, fix the version, tag again."
+              )
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"version={version}\n")
+          print(f"tag {tag} matches __version__ {version}")
+          PY
+
+      - name: Changelog must have a section for this version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          changelog = Path(os.environ["PACKAGE_DIR"]) / "CHANGELOG.md"
+          text = changelog.read_text()
+
+          def section(name: str) -> str | None:
+              pattern = rf"^## \[{re.escape(name)}\][^\n]*\n(.*?)(?=^## \[|^\[[^\]]+\]: |\Z)"
+              found = re.search(pattern, text, re.M | re.S)
+              return found.group(1).strip() if found else None
+
+          # A final release needs its own dated section. A release candidate may
+          # borrow the section of the version it is a candidate for, or Unreleased.
+          candidates = [version]
+          if "rc" in version:
+              candidates += [version.split("rc")[0], "Unreleased"]
+
+          for name in candidates:
+              body = section(name)
+              if body:
+                  Path("release-notes.md").write_text(body + "\n")
+                  print(f"release notes taken from CHANGELOG section [{name}]:\n")
+                  print(body)
+                  break
+          else:
+              sys.exit(
+                  f"::error file={changelog}::no non-empty section for "
+                  f"{' / '.join(candidates)}. Add '## [{version}] - YYYY-MM-DD'."
+              )
+          PY
+
+      - name: Build sdist and wheel
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      - name: twine check
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: python -m twine check --strict dist/*
+
+      - name: Artefacts carry the tagged version and the typing marker
+        working-directory: ${{ env.PACKAGE_DIR }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ls -l dist
+          test -f "dist/typedecide-${VERSION}-py3-none-any.whl"
+          test -f "dist/typedecide-${VERSION}.tar.gz"
+          python - <<'PY'
+          import os, sys, zipfile
+
+          version = os.environ["VERSION"]
+          names = zipfile.ZipFile(f"dist/typedecide-{version}-py3-none-any.whl").namelist()
+          required = [
+              "typedecide/py.typed",
+              "typedecide/__init__.py",
+              "typedecide/cli.py",
+              "typedecide/data/__init__.py",
+              "typedecide/training/__init__.py",
+              "typedecide/evaluation/__init__.py",
+              "typedecide/export/__init__.py",
+              f"typedecide-{version}.dist-info/licenses/LICENSE",
+          ]
+          missing = [name for name in required if name not in names]
+          stray = [n for n in names if not n.startswith(("typedecide/", f"typedecide-{version}.dist-info/"))]
+          if missing or stray:
+              sys.exit(f"::error::wheel is wrong. missing={missing} stray={stray}")
+          print(f"wheel ok: {len(names)} files")
+          PY
+
+      - name: Smoke-test the built wheel in a clean venv
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          WHEEL="$(realpath "${PACKAGE_DIR}/dist/typedecide-${VERSION}-py3-none-any.whl")"
+          python -m venv "${RUNNER_TEMP}/smoke"
+          "${RUNNER_TEMP}/smoke/bin/python" -m pip install --upgrade pip
+          "${RUNNER_TEMP}/smoke/bin/python" -m pip install "${WHEEL}"
+
+          # Run from outside the checkout so the installed wheel is what gets imported.
+          cd "${RUNNER_TEMP}"
+          "${RUNNER_TEMP}/smoke/bin/python" -c "import typedecide; print(typedecide.__version__)"
+          INSTALLED="$("${RUNNER_TEMP}/smoke/bin/python" -c "import typedecide; print(typedecide.__version__)")"
+          test "${INSTALLED}" = "${VERSION}"
+
+          "${RUNNER_TEMP}/smoke/bin/typedecide" --help
+
+          # The base install must stay light: importing the package may not drag in
+          # torch or transformers, whether or not they happen to be installed.
+          "${RUNNER_TEMP}/smoke/bin/python" - <<'PY'
+          import sys
+          import typedecide
+
+          heavy = sorted(m for m in ("torch", "transformers") if m in sys.modules)
+          assert not heavy, f"`import typedecide` imported {heavy}"
+          assert "site-packages" in typedecide.__file__, typedecide.__file__
+          print("import typedecide: torch and transformers not imported")
+          PY
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: ${{ env.PACKAGE_DIR }}/dist/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    if: contains(github.ref_name, 'rc')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/typedecide/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write # OIDC token for Trusted Publishing; the only credential used
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    if: ${{ !contains(github.ref_name, 'rc') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/typedecide/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write # OIDC token for Trusted Publishing; the only credential used
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: Create GitHub Release
+    needs: [build, publish-testpypi, publish-pypi]
+    # Exactly one publish job runs per tag and the other is skipped, so the default
+    # "all needs succeeded" rule would skip this job every time.
+    if: >-
+      ${{ always()
+      && needs.build.result == 'success'
+      && (needs.publish-pypi.result == 'success' || needs.publish-testpypi.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # create the release and attach files
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: notes/
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          FLAGS=(--verify-tag --title "typedecide ${VERSION}" --notes-file notes/release-notes.md)
+          case "${GITHUB_REF_NAME}" in
+            *rc*) FLAGS+=(--prerelease) ;;
+            *)    FLAGS+=(--latest) ;;
+          esac
+          gh release create "${GITHUB_REF_NAME}" dist/* "${FLAGS[@]}"

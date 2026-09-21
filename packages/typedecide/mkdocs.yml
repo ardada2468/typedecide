@@ -1,0 +1,222 @@
+# Documentation site for typedecide. Built by .github/workflows/docs.yml and served
+# from GitHub Pages. Build locally with:
+#
+#   pip install -r docs/requirements.txt
+#   mkdocs serve            # live preview on http://127.0.0.1:8000
+#   mkdocs build --strict   # what CI runs; every warning is a failure
+
+site_name: typedecide
+site_description: >-
+  Fine-tune small language models to answer bounded decisions by logit readout,
+  and ship the result to a browser.
+site_author: typedecide contributors
+
+# ---------------------------------------------------------------------------------
+# REPOSITORY LOCATION. These two lines are the ONLY place in this configuration to
+# change if the GitHub repository is not named `typedecide` (or moves to another
+# owner). The edit links, the header repo link, the sitemap and the canonical URLs all
+# derive from them. Page *content* also links to files on GitHub by absolute URL; after
+# changing these lines, run:  grep -rn "ardada2468/typedecide" docs/
+site_url: https://ardada2468.github.io/typedecide/
+repo_url: https://github.com/ardada2468/typedecide
+# ---------------------------------------------------------------------------------
+
+repo_name: GitHub
+edit_uri: edit/main/packages/typedecide/docs/
+copyright: MIT licensed. Not affiliated with openjev, sarvam-jev or Jev.
+
+docs_dir: docs
+site_dir: site
+strict: false   # CI passes --strict explicitly; `mkdocs serve` stays forgiving locally.
+
+# Make --strict catch more than the defaults do: a broken #anchor or a page left out of
+# the nav fails the build. `unrecognized_links` stays at info because the links to the
+# browser demo (`demo/`) point at files that docs.yml copies in after the build.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: info
+  anchors: warn
+
+# requirements.txt lives in docs/ for the workflow's benefit; it is not a page.
+exclude_docs: |
+  requirements.txt
+
+theme:
+  name: material
+  language: en
+  icon:
+    logo: material/alpha-a-box-outline
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - navigation.tracking
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.action.edit
+    - content.action.view
+    - content.tabs.link
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          # Static analysis of the source tree. Nothing is imported, so the build
+          # needs neither torch nor the package installed.
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            show_if_no_docstring: true
+            members_order: source
+            group_by_category: true
+            heading_level: 2
+            filters:
+              - "!^_"
+              - "!^LOGGER$"
+              - "!^log$"
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.keys
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/typedecide/
+      name: typedecide on PyPI
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/index.md
+      - Install: getting-started/install.md
+      - Your first dataset: getting-started/first-dataset.md
+      - End to end: getting-started/end-to-end.md
+  - Concepts:
+      - concepts/index.md
+      - The typed logit readout: concepts/readout.md
+      - Answer-slot discovery: concepts/answer-slots.md
+      - Shared-prefix amortisation: concepts/shared-prefix.md
+      - Position priors and debiasing: concepts/position-priors.md
+      - Group-aware splitting: concepts/group-splitting.md
+      - Answer-token-only loss: concepts/answer-token-loss.md
+      - Prompt parity: concepts/prompt-parity.md
+  - How-to guides:
+      - guides/index.md
+      - Bring your own data: guides/bring-your-own-data.md
+      - Read a validation report: guides/validation-report.md
+      - Configure training: guides/training.md
+      - Evaluate like a sceptic: guides/evaluating.md
+      - Export, prune and quantise: guides/exporting.md
+      - Deploy to the browser demo: guides/browser-deploy.md
+      - Handle errors: guides/error-handling.md
+      - Reproducibility and manifests: guides/reproducibility.md
+  - Reference:
+      - reference/index.md
+      - CLI: reference/cli.md
+      - Python API:
+          - reference/api/index.md
+          - typedecide.schema: reference/api/schema.md
+          - typedecide.prompt: reference/api/prompt.md
+          - typedecide.errors: reference/api/errors.md
+          - typedecide.data:
+              - loaders: reference/api/data/loaders.md
+              - validate: reference/api/data/validate.md
+              - split: reference/api/data/split.md
+              - augment: reference/api/data/augment.md
+          - typedecide.training:
+              - config: reference/api/training/config.md
+              - dataset: reference/api/training/dataset.md
+              - trainer: reference/api/training/trainer.md
+          - typedecide.evaluation:
+              - metrics: reference/api/evaluation/metrics.md
+              - readout: reference/api/evaluation/readout.md
+              - runner: reference/api/evaluation/runner.md
+          - typedecide.export:
+              - onnx: reference/api/export/onnx.md
+              - prune: reference/api/export/prune.md
+              - quantize: reference/api/export/quantize.md
+  - Runbooks:
+      - runbooks/index.md
+      - Data:
+          - Validation fails on a customer export: runbooks/validation-fails.md
+          - Split refuses, class missing from eval: runbooks/split-refuses.md
+      - Training:
+          - PromptError on a new tokenizer: runbooks/prompt-error-tokenizer.md
+          - Training loss not decreasing: runbooks/loss-not-decreasing.md
+          - Tuned model scores worse than base: runbooks/tuned-worse-than-base.md
+          - Model answers by position: runbooks/answers-by-position.md
+      - Shipping:
+          - Prompt parity check fails in CI: runbooks/prompt-parity-ci.md
+          - ONNX export fails or reload has no head: runbooks/onnx-export-fails.md
+          - Browser falls back to WASM or non-finite scores: runbooks/browser-wasm-nonfinite.md
+          - Releasing a new version: runbooks/releasing.md
+  - Performance:
+      - performance/index.md
+      - Making the readout fast: SPEED.md
+  - Project:
+      - project/index.md
+      - Changelog: project/changelog.md
+      - Versioning and deprecation: project/versioning.md
+      - Security: project/security.md
+      - Contributing: project/contributing.md
+      - Licence: project/licence.md
+      - Third-party credits: project/credits.md

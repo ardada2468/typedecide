@@ -1,0 +1,245 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+
+# Least privilege: every job here only reads the repository. Nothing publishes,
+# comments or uploads, so nothing is granted the right to.
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request supersedes the run in flight.
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PACKAGE_DIR: packages/typedecide
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  # PYTHONUTF8 is deliberately NOT set. The Windows run exists to catch a file opened
+  # without `encoding=`, and UTF-8 mode would hide exactly that bug from CI while
+  # leaving it in place for every Windows user.
+
+# Nothing here downloads model weights. The accuracy numbers are produced by
+# bench/ on a real machine and committed as JSON; CI only guards the things that
+# can break silently.
+jobs:
+  # ---------------------------------------------------------------------------
+  # Repository-wide guards. Every step of the original single-job workflow is
+  # kept; the library's own tests, lint and types moved to the jobs below so they
+  # can run on more than one interpreter.
+  # ---------------------------------------------------------------------------
+  checks:
+    name: Repository checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: packages/typedecide/pyproject.toml
+
+      - name: Syntax-check every script
+        run: |
+          for f in web/*.js bench/*.mjs; do node --check "$f"; done
+          python -m compileall -q train/ packages/typedecide/src/
+
+      - name: Install the library
+        run: python -m pip install -e "packages/typedecide[dev]"
+
+      - name: Library tests
+        run: python -m pytest packages/typedecide -q
+
+      - name: Lint the library
+        run: python -m ruff check packages/typedecide/src packages/typedecide/tests
+
+      - name: Importing the library pulls in no heavy dependency
+        run: |
+          python - <<'PY'
+          import sys
+          import typedecide, typedecide.data, typedecide.training, typedecide.evaluation
+          import typedecide.export, typedecide.cli
+          heavy = [m for m in ("torch", "transformers", "peft", "datasets", "onnx") if m in sys.modules]
+          assert not heavy, f"import typedecide pulled in {heavy}"
+          PY
+
+      - name: Prompt parity, web/prompt.js against train/prompt.py
+        run: python train/check_parity.py
+
+      - name: Prompt parity, web/prompt.js against typedecide.prompt
+        # Fails rather than skips if node went missing: a skipped parity test is
+        # the silent failure this step exists to prevent.
+        run: |
+          python -m pytest packages/typedecide/tests/test_prompt_parity.py -q -rs | tee parity.log
+          if grep -q SKIPPED parity.log; then
+            echo "The prompt parity test was skipped; it must run in CI."; exit 1
+          fi
+
+      - name: Synthesiser produces balanced data
+        run: python train/synthesize.py --tickets 40
+
+      - name: Metric unit tests
+        run: node --test bench/*.test.mjs
+
+      - name: No API keys committed
+        run: |
+          if grep -rIn --exclude-dir=.git -E '(sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,})' .; then
+            echo "Possible credential in the tree"; exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Types. mypy is pinned to `python_version = "3.10"` in pyproject.toml, so it
+  # runs on 3.10: that is the floor the library promises, and numpy >= 2.4 (what
+  # pip resolves on 3.12+) ships stubs using the 3.12-only `type` statement, which
+  # mypy refuses to parse under a 3.10 target -- `errors prevented further checking`.
+  # ---------------------------------------------------------------------------
+  types:
+    name: mypy --strict (Python 3.10)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: packages/typedecide/pyproject.toml
+      - run: python -m pip install -e "packages/typedecide[dev]"
+      - name: Type-check the library
+        run: python -m mypy --strict packages/typedecide/src/typedecide
+
+  # ---------------------------------------------------------------------------
+  # The library on every interpreter it claims, plus one macOS and one Windows
+  # run. Windows is the one that finds newline, encoding and path bugs.
+  # ---------------------------------------------------------------------------
+  library:
+    name: Library (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ['3.10', '3.11', '3.12', '3.13']
+        include:
+          - { os: macos-latest, python: '3.12' }
+          - { os: windows-latest, python: '3.12' }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: packages/typedecide/pyproject.toml
+
+      - name: Install the library with its dev extra only
+        run: python -m pip install -e "packages/typedecide[dev]"
+
+      # Measured on 0.1.0 with [dev] only (no pyarrow, no onnx, so six tests skip):
+      # 96.08% line+branch on Python 3.12. The floor is 95: one point of room for
+      # platform-conditional branches, none for a module losing its tests. With
+      # pyarrow and onnx installed the same suite measures 99% (see `coverage` below).
+      - name: Tests with coverage
+        working-directory: packages/typedecide
+        run: >
+          python -m pytest -q -rs
+          --cov=typedecide --cov-branch
+          --cov-report=term-missing:skip-covered
+          --cov-fail-under=95
+
+  # ---------------------------------------------------------------------------
+  # The same suite with the light optional extras present, so the Parquet loader
+  # and the ONNX graph surgery are exercised for real instead of skipped. Still
+  # no torch and no model weights.
+  # ---------------------------------------------------------------------------
+  coverage:
+    name: Coverage with pyarrow and onnx
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: packages/typedecide/pyproject.toml
+      - run: python -m pip install -e "packages/typedecide[dev,parquet]" "onnx>=1.16"
+      # Measured 99% with these extras. 97 leaves room for a new torch-only branch
+      # and still fails if the Parquet or ONNX tests stop running.
+      - name: Tests with coverage
+        working-directory: packages/typedecide
+        run: >
+          python -m pytest -q -rs
+          --cov=typedecide --cov-branch
+          --cov-report=term-missing:skip-covered
+          --cov-report=xml:coverage.xml
+          --cov-fail-under=97
+      - name: Keep the coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: packages/typedecide/coverage.xml
+          if-no-files-found: ignore
+      - name: Coverage summary
+        if: always()
+        working-directory: packages/typedecide
+        run: |
+          {
+            echo '### typedecide coverage (line + branch)'
+            echo '```'
+            python -m coverage report --skip-covered | tail -n 25
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Known vulnerabilities in what a user actually gets from `pip install
+  # typedecide`: the base install, which is numpy and pyyaml. Blocking. The
+  # optional extras (torch, transformers, ...) are the user's to pin and are not
+  # audited here; SECURITY.md says so.
+  # ---------------------------------------------------------------------------
+  audit:
+    name: pip-audit (base install)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: packages/typedecide/pyproject.toml
+      - name: Install the base package into a clean environment
+        run: |
+          python -m venv "$RUNNER_TEMP/base"
+          "$RUNNER_TEMP/base/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/base/bin/python" -m pip install ./packages/typedecide
+          "$RUNNER_TEMP/base/bin/python" -m pip freeze --exclude typedecide > "$RUNNER_TEMP/base.txt"
+          cat "$RUNNER_TEMP/base.txt"
+      - name: Audit it
+        run: |
+          python -m pip install pip-audit
+          # The freeze is already fully resolved and pinned, so nothing is re-resolved.
+          python -m pip_audit --strict --no-deps --disable-pip --requirement "$RUNNER_TEMP/base.txt"

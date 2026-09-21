@@ -1,0 +1,18 @@
+{
+  "measurement": "marginal cost of a suffix token, shared prefix held fixed",
+  "model": "onnx-community/Qwen3-0.6B-ONNX",
+  "dtype": "q4f16",
+  "backend": "onnxruntime-node, CPU",
+  "note": "Not comparable to the browser's WebGPU figures. The point is the SHAPE: cost is linear in suffix length, and the per-token term carries the unembedding and the logits readback for positions nobody reads.",
+  "prefix_tokens": 35,
+  "points_ms": { "1": 32.1, "8": 54.0, "16": 80.0, "32": 132.4, "64": 233.6, "96": 339.6 },
+  "fit": { "fixed_ms": 28.4, "per_suffix_token_ms": 3.23 },
+  "typical_criterion": { "suffix_tokens": 45, "projected_ms": 174 },
+  "unembedding_share_of_per_token_flops": 0.26,
+  "logits_bytes_per_token_fp32": 607744,
+  "bounds_if_trimmed_to_last_position": {
+    "lower": "1.27x  (removing only the unembedding FLOPs for 44 of 45 positions)",
+    "upper": "5.5x   (if the entire per-token term were logits-related, which it is not)",
+    "status": "A trimmed export has not been built or timed. These are bounds, not a result."
+  }
+}
