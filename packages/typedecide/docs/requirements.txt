@@ -8,4 +8,4 @@ mkdocs-material~=9.6
 mkdocstrings[python]~=0.30
 pymdown-extensions~=10.14
 # Only used by mkdocstrings to wrap long signatures in the API reference.
-black>=24.8,<27
+black>=26.5.1,<27
