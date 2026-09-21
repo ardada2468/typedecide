@@ -5,7 +5,7 @@
 # so torch/transformers are never needed to build the docs.
 mkdocs~=1.6.1
 mkdocs-material~=9.6
-mkdocstrings[python]~=0.30
+mkdocstrings[python]>=0.30,<2.0
 pymdown-extensions~=10.14
 # Only used by mkdocstrings to wrap long signatures in the API reference.
 black>=24.8,<27
