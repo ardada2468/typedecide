@@ -7,5 +7,5 @@
     "shared": "node shared_check.mjs",
     "rotation": "node rotation_probe.mjs"
   },
-  "dependencies": { "@huggingface/transformers": "^4.3.0" }
+  "dependencies": { "@huggingface/transformers": "^4.3.1" }
 }
